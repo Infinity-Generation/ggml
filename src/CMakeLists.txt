@@ -531,9 +531,15 @@ if (GGML_CPU_ALL_VARIANTS_STATIC)
     # Mirror the GGML_BACKEND_BUILD/SHARED defines that ggml_add_backend_library
     # applies to normal backends so the dispatcher's ggml_backend_cpu_reg() and
     # public-API forwarders carry __declspec(dllexport) markup at build time.
+    # Also propagate GGML_BACKEND_BUILD to the `ggml` target itself: it owns
+    # ggml-backend-reg.cpp which calls ggml_backend_cpu_reg() directly. In DL
+    # mode that file consumes the function as __declspec(dllimport) (since the
+    # backend lives in a sibling DLL); in static-multi-variant mode the symbol
+    # is in the same DLL, so the importing side must agree it's dllexport.
     if (BUILD_SHARED_LIBS)
         target_compile_definitions(ggml-cpu-dispatch PRIVATE GGML_BACKEND_BUILD)
         target_compile_definitions(ggml-cpu-dispatch PUBLIC  GGML_BACKEND_SHARED)
+        target_compile_definitions(ggml                PRIVATE GGML_BACKEND_BUILD)
     endif()
 
     # Link the dispatcher AND every variant archive into ggml. Whole-archive is
