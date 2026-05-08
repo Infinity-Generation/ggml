@@ -492,14 +492,14 @@ if (GGML_CPU_ALL_VARIANTS_STATIC)
     set(_variant_table_entries "")
     foreach(_tag IN LISTS _variant_tags)
         string(APPEND _variant_forward_decls
-            "ggml_backend_reg_t ggml_backend_cpu_reg_${_tag}(void)\;\n"
-            "int                ${_arch_score_prefix}_${_tag}(void)\;\n")
+            "ggml_backend_reg_t ggml_backend_cpu_reg_${_tag}(void);\n"
+            "int                ${_arch_score_prefix}_${_tag}(void);\n")
         string(APPEND _variant_public_forwards
-            "ggml_backend_t ggml_backend_cpu_init_${_tag}(void)\;\n"
-            "void ggml_backend_cpu_set_n_threads_${_tag}(ggml_backend_t, int)\;\n"
-            "void ggml_backend_cpu_set_threadpool_${_tag}(ggml_backend_t, ggml_threadpool_t)\;\n"
-            "void ggml_backend_cpu_set_abort_callback_${_tag}(ggml_backend_t, ggml_abort_callback, void *)\;\n"
-            "void ggml_backend_cpu_set_use_ref_${_tag}(ggml_backend_t, bool)\;\n")
+            "ggml_backend_t ggml_backend_cpu_init_${_tag}(void);\n"
+            "void ggml_backend_cpu_set_n_threads_${_tag}(ggml_backend_t, int);\n"
+            "void ggml_backend_cpu_set_threadpool_${_tag}(ggml_backend_t, ggml_threadpool_t);\n"
+            "void ggml_backend_cpu_set_abort_callback_${_tag}(ggml_backend_t, ggml_abort_callback, void *);\n"
+            "void ggml_backend_cpu_set_use_ref_${_tag}(ggml_backend_t, bool);\n")
         string(APPEND _variant_table_entries
             "    { \"${_tag}\","
             " &${_arch_score_prefix}_${_tag},"
