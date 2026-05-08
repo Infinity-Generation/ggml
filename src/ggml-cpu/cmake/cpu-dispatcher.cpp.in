@@ -79,6 +79,31 @@ struct cpu_variant {
     int  (* has_llamafile)(void);
     int  (* get_rvv_vlen)(void);
     int  (* get_sve_cnt)(void);
+    // Tensor / graph public-API forwarders (variant-independent in behavior,
+    // but defined per-variant TU so we forward to the chosen variant for
+    // simplicity — same dispatch fast path).
+    void                              (* numa_init)(enum ggml_numa_strategy);
+    bool                              (* is_numa)(void);
+    struct ggml_tensor *              (* new_i32)(struct ggml_context *, int32_t);
+    struct ggml_tensor *              (* new_f32)(struct ggml_context *, float);
+    struct ggml_tensor *              (* set_i32)(struct ggml_tensor *, int32_t);
+    struct ggml_tensor *              (* set_f32)(struct ggml_tensor *, float);
+    int32_t                           (* get_i32_1d)(const struct ggml_tensor *, int);
+    void                              (* set_i32_1d)(const struct ggml_tensor *, int, int32_t);
+    int32_t                           (* get_i32_nd)(const struct ggml_tensor *, int, int, int, int);
+    void                              (* set_i32_nd)(const struct ggml_tensor *, int, int, int, int, int32_t);
+    float                             (* get_f32_1d)(const struct ggml_tensor *, int);
+    void                              (* set_f32_1d)(const struct ggml_tensor *, int, float);
+    float                             (* get_f32_nd)(const struct ggml_tensor *, int, int, int, int);
+    void                              (* set_f32_nd)(const struct ggml_tensor *, int, int, int, int, float);
+    struct ggml_threadpool *          (* threadpool_new)(struct ggml_threadpool_params *);
+    void                              (* threadpool_free)(struct ggml_threadpool *);
+    void                              (* threadpool_pause)(struct ggml_threadpool *);
+    void                              (* threadpool_resume)(struct ggml_threadpool *);
+    struct ggml_cplan                 (* graph_plan)(const struct ggml_cgraph *, int, struct ggml_threadpool *);
+    enum ggml_status                  (* graph_compute)(struct ggml_cgraph *, struct ggml_cplan *);
+    enum ggml_status                  (* graph_compute_with_ctx)(struct ggml_context *, struct ggml_cgraph *, int);
+    const struct ggml_type_traits_cpu * (* get_type_traits_cpu)(enum ggml_type);
 };
 
 // Variants are listed in declaration order; the dispatcher picks by max score.
@@ -185,5 +210,29 @@ int ggml_cpu_has_wasm_simd(void)   { const cpu_variant * v = chosen_variant(); r
 int ggml_cpu_has_llamafile(void)   { const cpu_variant * v = chosen_variant(); return v ? v->has_llamafile()   : 0; }
 int ggml_cpu_get_rvv_vlen(void)    { const cpu_variant * v = chosen_variant(); return v ? v->get_rvv_vlen()    : 0; }
 int ggml_cpu_get_sve_cnt(void)     { const cpu_variant * v = chosen_variant(); return v ? v->get_sve_cnt()     : 0; }
+
+// Tensor / graph public-API forwarders.
+void                  ggml_numa_init(enum ggml_numa_strategy s)            { const cpu_variant * v = chosen_variant(); if (v) v->numa_init(s); }
+bool                  ggml_is_numa(void)                                   { const cpu_variant * v = chosen_variant(); return v ? v->is_numa() : false; }
+struct ggml_tensor *  ggml_new_i32(struct ggml_context * c, int32_t x)     { const cpu_variant * v = chosen_variant(); return v ? v->new_i32(c, x) : nullptr; }
+struct ggml_tensor *  ggml_new_f32(struct ggml_context * c, float x)       { const cpu_variant * v = chosen_variant(); return v ? v->new_f32(c, x) : nullptr; }
+struct ggml_tensor *  ggml_set_i32(struct ggml_tensor * t, int32_t x)      { const cpu_variant * v = chosen_variant(); return v ? v->set_i32(t, x) : nullptr; }
+struct ggml_tensor *  ggml_set_f32(struct ggml_tensor * t, float x)        { const cpu_variant * v = chosen_variant(); return v ? v->set_f32(t, x) : nullptr; }
+int32_t               ggml_get_i32_1d(const struct ggml_tensor * t, int i) { const cpu_variant * v = chosen_variant(); return v ? v->get_i32_1d(t, i) : 0; }
+void                  ggml_set_i32_1d(const struct ggml_tensor * t, int i, int32_t x) { const cpu_variant * v = chosen_variant(); if (v) v->set_i32_1d(t, i, x); }
+int32_t               ggml_get_i32_nd(const struct ggml_tensor * t, int a, int b, int c, int d) { const cpu_variant * v = chosen_variant(); return v ? v->get_i32_nd(t, a, b, c, d) : 0; }
+void                  ggml_set_i32_nd(const struct ggml_tensor * t, int a, int b, int c, int d, int32_t x) { const cpu_variant * v = chosen_variant(); if (v) v->set_i32_nd(t, a, b, c, d, x); }
+float                 ggml_get_f32_1d(const struct ggml_tensor * t, int i) { const cpu_variant * v = chosen_variant(); return v ? v->get_f32_1d(t, i) : 0.0f; }
+void                  ggml_set_f32_1d(const struct ggml_tensor * t, int i, float x) { const cpu_variant * v = chosen_variant(); if (v) v->set_f32_1d(t, i, x); }
+float                 ggml_get_f32_nd(const struct ggml_tensor * t, int a, int b, int c, int d) { const cpu_variant * v = chosen_variant(); return v ? v->get_f32_nd(t, a, b, c, d) : 0.0f; }
+void                  ggml_set_f32_nd(const struct ggml_tensor * t, int a, int b, int c, int d, float x) { const cpu_variant * v = chosen_variant(); if (v) v->set_f32_nd(t, a, b, c, d, x); }
+struct ggml_threadpool * ggml_threadpool_new(struct ggml_threadpool_params * p)   { const cpu_variant * v = chosen_variant(); return v ? v->threadpool_new(p) : nullptr; }
+void                  ggml_threadpool_free(struct ggml_threadpool * tp)    { const cpu_variant * v = chosen_variant(); if (v) v->threadpool_free(tp); }
+void                  ggml_threadpool_pause(struct ggml_threadpool * tp)   { const cpu_variant * v = chosen_variant(); if (v) v->threadpool_pause(tp); }
+void                  ggml_threadpool_resume(struct ggml_threadpool * tp)  { const cpu_variant * v = chosen_variant(); if (v) v->threadpool_resume(tp); }
+struct ggml_cplan     ggml_graph_plan(const struct ggml_cgraph * g, int n, struct ggml_threadpool * tp) { const cpu_variant * v = chosen_variant(); if (v) return v->graph_plan(g, n, tp); ggml_cplan z = {}; return z; }
+enum ggml_status      ggml_graph_compute(struct ggml_cgraph * g, struct ggml_cplan * p) { const cpu_variant * v = chosen_variant(); return v ? v->graph_compute(g, p) : GGML_STATUS_FAILED; }
+enum ggml_status      ggml_graph_compute_with_ctx(struct ggml_context * c, struct ggml_cgraph * g, int n) { const cpu_variant * v = chosen_variant(); return v ? v->graph_compute_with_ctx(c, g, n) : GGML_STATUS_FAILED; }
+const struct ggml_type_traits_cpu * ggml_get_type_traits_cpu(enum ggml_type t) { const cpu_variant * v = chosen_variant(); return v ? v->get_type_traits_cpu(t) : nullptr; }
 
 } // extern "C"
