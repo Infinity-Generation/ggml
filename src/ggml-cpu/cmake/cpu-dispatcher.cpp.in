@@ -49,6 +49,36 @@ struct cpu_variant {
     void            (* set_threadpool)(ggml_backend_t, ggml_threadpool_t);
     void            (* set_abort_callback)(ggml_backend_t, ggml_abort_callback, void *);
     void            (* set_use_ref)(ggml_backend_t, bool);
+    // CPU feature query forwarders (declared in ggml-cpu.h, called by external
+    // consumers like stable-diffusion). These return per-variant compile-time
+    // constants; the dispatcher reports the values for the chosen variant.
+    int  (* has_avx)(void);
+    int  (* has_avx_vnni)(void);
+    int  (* has_avx2)(void);
+    int  (* has_avx512)(void);
+    int  (* has_avx512_vbmi)(void);
+    int  (* has_avx512_vnni)(void);
+    int  (* has_avx512_bf16)(void);
+    int  (* has_amx_int8)(void);
+    int  (* has_bmi2)(void);
+    int  (* has_fma)(void);
+    int  (* has_f16c)(void);
+    int  (* has_sse3)(void);
+    int  (* has_ssse3)(void);
+    int  (* has_neon)(void);
+    int  (* has_arm_fma)(void);
+    int  (* has_fp16_va)(void);
+    int  (* has_dotprod)(void);
+    int  (* has_sve)(void);
+    int  (* has_matmul_int8)(void);
+    int  (* has_sme)(void);
+    int  (* has_riscv_v)(void);
+    int  (* has_vsx)(void);
+    int  (* has_vxe)(void);
+    int  (* has_wasm_simd)(void);
+    int  (* has_llamafile)(void);
+    int  (* get_rvv_vlen)(void);
+    int  (* get_sve_cnt)(void);
 };
 
 // Variants are listed in declaration order; the dispatcher picks by max score.
@@ -119,5 +149,41 @@ void ggml_backend_cpu_set_use_ref(ggml_backend_t backend, bool use_ref) {
     const cpu_variant * v = chosen_variant();
     if (v) v->set_use_ref(backend, use_ref);
 }
+
+// CPU feature query forwarders. Each returns the chosen variant's compile-
+// time const (or 0 if no variant matched, which shouldn't happen — every
+// build registers at least the x64 baseline whose score is always >= 1).
+#define GGML_CPU_QUERY_FWD(name) \
+    int name(void) { const cpu_variant * v = chosen_variant(); return v ? v->name##_fn() : 0; }
+
+// We can't macro-stamp these because the table member name (`has_avx`) and
+// the public function (`ggml_cpu_has_avx`) don't share a stem. Hand-write.
+int ggml_cpu_has_avx(void)         { const cpu_variant * v = chosen_variant(); return v ? v->has_avx()         : 0; }
+int ggml_cpu_has_avx_vnni(void)    { const cpu_variant * v = chosen_variant(); return v ? v->has_avx_vnni()    : 0; }
+int ggml_cpu_has_avx2(void)        { const cpu_variant * v = chosen_variant(); return v ? v->has_avx2()        : 0; }
+int ggml_cpu_has_avx512(void)      { const cpu_variant * v = chosen_variant(); return v ? v->has_avx512()      : 0; }
+int ggml_cpu_has_avx512_vbmi(void) { const cpu_variant * v = chosen_variant(); return v ? v->has_avx512_vbmi() : 0; }
+int ggml_cpu_has_avx512_vnni(void) { const cpu_variant * v = chosen_variant(); return v ? v->has_avx512_vnni() : 0; }
+int ggml_cpu_has_avx512_bf16(void) { const cpu_variant * v = chosen_variant(); return v ? v->has_avx512_bf16() : 0; }
+int ggml_cpu_has_amx_int8(void)    { const cpu_variant * v = chosen_variant(); return v ? v->has_amx_int8()    : 0; }
+int ggml_cpu_has_bmi2(void)        { const cpu_variant * v = chosen_variant(); return v ? v->has_bmi2()        : 0; }
+int ggml_cpu_has_fma(void)         { const cpu_variant * v = chosen_variant(); return v ? v->has_fma()         : 0; }
+int ggml_cpu_has_f16c(void)        { const cpu_variant * v = chosen_variant(); return v ? v->has_f16c()        : 0; }
+int ggml_cpu_has_sse3(void)        { const cpu_variant * v = chosen_variant(); return v ? v->has_sse3()        : 0; }
+int ggml_cpu_has_ssse3(void)       { const cpu_variant * v = chosen_variant(); return v ? v->has_ssse3()       : 0; }
+int ggml_cpu_has_neon(void)        { const cpu_variant * v = chosen_variant(); return v ? v->has_neon()        : 0; }
+int ggml_cpu_has_arm_fma(void)     { const cpu_variant * v = chosen_variant(); return v ? v->has_arm_fma()     : 0; }
+int ggml_cpu_has_fp16_va(void)     { const cpu_variant * v = chosen_variant(); return v ? v->has_fp16_va()     : 0; }
+int ggml_cpu_has_dotprod(void)     { const cpu_variant * v = chosen_variant(); return v ? v->has_dotprod()     : 0; }
+int ggml_cpu_has_sve(void)         { const cpu_variant * v = chosen_variant(); return v ? v->has_sve()         : 0; }
+int ggml_cpu_has_matmul_int8(void) { const cpu_variant * v = chosen_variant(); return v ? v->has_matmul_int8() : 0; }
+int ggml_cpu_has_sme(void)         { const cpu_variant * v = chosen_variant(); return v ? v->has_sme()         : 0; }
+int ggml_cpu_has_riscv_v(void)     { const cpu_variant * v = chosen_variant(); return v ? v->has_riscv_v()     : 0; }
+int ggml_cpu_has_vsx(void)         { const cpu_variant * v = chosen_variant(); return v ? v->has_vsx()         : 0; }
+int ggml_cpu_has_vxe(void)         { const cpu_variant * v = chosen_variant(); return v ? v->has_vxe()         : 0; }
+int ggml_cpu_has_wasm_simd(void)   { const cpu_variant * v = chosen_variant(); return v ? v->has_wasm_simd()   : 0; }
+int ggml_cpu_has_llamafile(void)   { const cpu_variant * v = chosen_variant(); return v ? v->has_llamafile()   : 0; }
+int ggml_cpu_get_rvv_vlen(void)    { const cpu_variant * v = chosen_variant(); return v ? v->get_rvv_vlen()    : 0; }
+int ggml_cpu_get_sve_cnt(void)     { const cpu_variant * v = chosen_variant(); return v ? v->get_sve_cnt()     : 0; }
 
 } // extern "C"

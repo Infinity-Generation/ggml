@@ -499,7 +499,16 @@ if (GGML_CPU_ALL_VARIANTS_STATIC)
             "void ggml_backend_cpu_set_n_threads_${_tag}(ggml_backend_t, int);\n"
             "void ggml_backend_cpu_set_threadpool_${_tag}(ggml_backend_t, ggml_threadpool_t);\n"
             "void ggml_backend_cpu_set_abort_callback_${_tag}(ggml_backend_t, ggml_abort_callback, void *);\n"
-            "void ggml_backend_cpu_set_use_ref_${_tag}(ggml_backend_t, bool);\n")
+            "void ggml_backend_cpu_set_use_ref_${_tag}(ggml_backend_t, bool);\n"
+            "int ggml_cpu_has_avx_${_tag}(void); int ggml_cpu_has_avx_vnni_${_tag}(void); int ggml_cpu_has_avx2_${_tag}(void);\n"
+            "int ggml_cpu_has_avx512_${_tag}(void); int ggml_cpu_has_avx512_vbmi_${_tag}(void); int ggml_cpu_has_avx512_vnni_${_tag}(void);\n"
+            "int ggml_cpu_has_avx512_bf16_${_tag}(void); int ggml_cpu_has_amx_int8_${_tag}(void); int ggml_cpu_has_bmi2_${_tag}(void);\n"
+            "int ggml_cpu_has_fma_${_tag}(void); int ggml_cpu_has_f16c_${_tag}(void); int ggml_cpu_has_sse3_${_tag}(void);\n"
+            "int ggml_cpu_has_ssse3_${_tag}(void); int ggml_cpu_has_neon_${_tag}(void); int ggml_cpu_has_arm_fma_${_tag}(void);\n"
+            "int ggml_cpu_has_fp16_va_${_tag}(void); int ggml_cpu_has_dotprod_${_tag}(void); int ggml_cpu_has_sve_${_tag}(void);\n"
+            "int ggml_cpu_has_matmul_int8_${_tag}(void); int ggml_cpu_has_sme_${_tag}(void); int ggml_cpu_has_riscv_v_${_tag}(void);\n"
+            "int ggml_cpu_has_vsx_${_tag}(void); int ggml_cpu_has_vxe_${_tag}(void); int ggml_cpu_has_wasm_simd_${_tag}(void);\n"
+            "int ggml_cpu_has_llamafile_${_tag}(void); int ggml_cpu_get_rvv_vlen_${_tag}(void); int ggml_cpu_get_sve_cnt_${_tag}(void);\n")
         string(APPEND _variant_table_entries
             "    { \"${_tag}\","
             " &${_arch_score_prefix}_${_tag},"
@@ -508,7 +517,17 @@ if (GGML_CPU_ALL_VARIANTS_STATIC)
             " &ggml_backend_cpu_set_n_threads_${_tag},"
             " &ggml_backend_cpu_set_threadpool_${_tag},"
             " &ggml_backend_cpu_set_abort_callback_${_tag},"
-            " &ggml_backend_cpu_set_use_ref_${_tag} },\n")
+            " &ggml_backend_cpu_set_use_ref_${_tag},"
+            " &ggml_cpu_has_avx_${_tag}, &ggml_cpu_has_avx_vnni_${_tag}, &ggml_cpu_has_avx2_${_tag},"
+            " &ggml_cpu_has_avx512_${_tag}, &ggml_cpu_has_avx512_vbmi_${_tag}, &ggml_cpu_has_avx512_vnni_${_tag},"
+            " &ggml_cpu_has_avx512_bf16_${_tag}, &ggml_cpu_has_amx_int8_${_tag}, &ggml_cpu_has_bmi2_${_tag},"
+            " &ggml_cpu_has_fma_${_tag}, &ggml_cpu_has_f16c_${_tag}, &ggml_cpu_has_sse3_${_tag},"
+            " &ggml_cpu_has_ssse3_${_tag}, &ggml_cpu_has_neon_${_tag}, &ggml_cpu_has_arm_fma_${_tag},"
+            " &ggml_cpu_has_fp16_va_${_tag}, &ggml_cpu_has_dotprod_${_tag}, &ggml_cpu_has_sve_${_tag},"
+            " &ggml_cpu_has_matmul_int8_${_tag}, &ggml_cpu_has_sme_${_tag}, &ggml_cpu_has_riscv_v_${_tag},"
+            " &ggml_cpu_has_vsx_${_tag}, &ggml_cpu_has_vxe_${_tag}, &ggml_cpu_has_wasm_simd_${_tag},"
+            " &ggml_cpu_has_llamafile_${_tag}, &ggml_cpu_get_rvv_vlen_${_tag}, &ggml_cpu_get_sve_cnt_${_tag}"
+            " },\n")
     endforeach()
 
     set(GGML_CPU_DISPATCHER_FORWARD_DECLS    "${_variant_forward_decls}")
