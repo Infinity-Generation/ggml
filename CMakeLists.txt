@@ -425,13 +425,6 @@ if (MSVC)
     )
     function(configure_msvc_target target_name)
         if(TARGET ${target_name})
-            get_target_property(_t_type ${target_name} TYPE)
-            if(_t_type STREQUAL "INTERFACE_LIBRARY")
-                # INTERFACE targets only accept INTERFACE properties, and these
-                # warning/UTF-8 flags don't propagate meaningfully through them
-                # anyway -- the consumed targets already get them directly.
-                return()
-            endif()
             target_compile_options(${target_name} PRIVATE ${MSVC_WARNING_FLAGS})
             target_compile_options(${target_name} PRIVATE ${MSVC_COMPILE_OPTIONS})
         endif()
