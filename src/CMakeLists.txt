@@ -566,6 +566,24 @@ if (GGML_CPU_ALL_VARIANTS_STATIC)
     # can resolve them.
     install(TARGETS ggml-cpu-dispatch ${_static_variant_targets} ARCHIVE)
 
+    # Expose an INTERFACE umbrella target named `ggml-cpu` so downstream code
+    # that still expects `ggml::ggml-cpu` (the conventional name) keeps working.
+    # It carries a transitive dep on `ggml`, which itself already pulls in the
+    # dispatcher + variant archives via the whole-archive link options above.
+    add_library(ggml-cpu INTERFACE)
+    target_link_libraries(ggml-cpu INTERFACE ggml)
+    install(TARGETS ggml-cpu EXPORT ggml-targets)
+    if(NOT GGML_AVAILABLE_BACKENDS)
+        set(GGML_AVAILABLE_BACKENDS "ggml-cpu"
+            CACHE INTERNAL "List of backends for cmake package")
+    else()
+        list(FIND GGML_AVAILABLE_BACKENDS "ggml-cpu" _has_cpu)
+        if(_has_cpu EQUAL -1)
+            set(GGML_AVAILABLE_BACKENDS "${GGML_AVAILABLE_BACKENDS};ggml-cpu"
+                CACHE INTERNAL "List of backends for cmake package")
+        endif()
+    endif()
+
     set(GGML_CPU_NAME "ggml-cpu")  # for downstream find_package compat
 endif()
 
