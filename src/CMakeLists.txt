@@ -528,6 +528,13 @@ if (GGML_CPU_ALL_VARIANTS_STATIC)
         "${CMAKE_CURRENT_SOURCE_DIR}/../include")
     target_compile_features(ggml-cpu-dispatch PRIVATE cxx_std_17)
     set_target_properties(ggml-cpu-dispatch PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    # Mirror the GGML_BACKEND_BUILD/SHARED defines that ggml_add_backend_library
+    # applies to normal backends so the dispatcher's ggml_backend_cpu_reg() and
+    # public-API forwarders carry __declspec(dllexport) markup at build time.
+    if (BUILD_SHARED_LIBS)
+        target_compile_definitions(ggml-cpu-dispatch PRIVATE GGML_BACKEND_BUILD)
+        target_compile_definitions(ggml-cpu-dispatch PUBLIC  GGML_BACKEND_SHARED)
+    endif()
 
     # Link the dispatcher AND every variant archive into ggml. Whole-archive is
     # required so the variants' mangled entry points survive --gc-sections / LTO
