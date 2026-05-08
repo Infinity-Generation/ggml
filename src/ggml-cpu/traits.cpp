@@ -2,11 +2,15 @@
 
 #include "ggml-backend-impl.h"
 #include "ggml-backend.h"
+// traits.h already pulls in variant-ns.h; explicit include kept for clarity.
+#include "variant-ns.h"
 
 namespace ggml::cpu {
+GGML_CPU_VNS_BEGIN
 tensor_traits::~tensor_traits() {}
 
 extra_buffer_type::~extra_buffer_type() {}
+GGML_CPU_VNS_END
 }  // namespace ggml::cpu
 
 bool ggml_cpu_extra_compute_forward(struct ggml_compute_params * params, struct ggml_tensor * op) {

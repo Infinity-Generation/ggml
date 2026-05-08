@@ -2,6 +2,7 @@
 #include "ggml-backend-impl.h"
 #include "ggml-cpu-impl.h"
 #include "ggml.h"
+#include "variant-ns.h"
 
 #ifdef __cplusplus
 #    include <vector>
@@ -16,6 +17,7 @@ bool ggml_cpu_extra_work_size(int n_threads, const struct ggml_tensor * op, size
 }
 
 namespace ggml::cpu {
+GGML_CPU_VNS_BEGIN
 // register in tensor->extra
 class tensor_traits {
   public:
@@ -30,6 +32,7 @@ class extra_buffer_type {
     virtual bool            supports_op(ggml_backend_dev_t dev, const struct ggml_tensor * op) = 0;
     virtual tensor_traits * get_tensor_traits(const struct ggml_tensor * op)                   = 0;
 };
+GGML_CPU_VNS_END
 }  // namespace ggml::cpu
 
 // implemented in ggml-cpu.cpp.

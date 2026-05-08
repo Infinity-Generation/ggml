@@ -3857,6 +3857,7 @@ static int repack_mxfp4_to_mxfp4_8_bl(struct ggml_tensor * t, int interleave_blo
 }
 
 namespace ggml::cpu::repack {
+GGML_CPU_VNS_BEGIN
 // repack
 template <typename BLOC_TYPE, int64_t INTER_SIZE, int64_t NB_COLS>
 int repack(struct ggml_tensor *, const void *, size_t);
@@ -4520,6 +4521,7 @@ template <typename BLOC_TYPE, int64_t INTER_SIZE, int64_t NB_COLS, ggml_type PAR
     }
 };
 
+GGML_CPU_VNS_END
 }  // namespace ggml::cpu::repack
 
 static const ggml::cpu::tensor_traits * ggml_repack_get_optimal_repack_type(const struct ggml_tensor * cur) {
@@ -4767,6 +4769,7 @@ static size_t ggml_backend_cpu_repack_buffer_type_get_alignment(ggml_backend_buf
 }
 
 namespace ggml::cpu::repack {
+GGML_CPU_VNS_BEGIN
 class extra_buffer_type : ggml::cpu::extra_buffer_type {
     bool supports_op(ggml_backend_dev_t, const struct ggml_tensor * op) override {
         if (    op->op == GGML_OP_MUL_MAT &&
@@ -4813,6 +4816,7 @@ class extra_buffer_type : ggml::cpu::extra_buffer_type {
         return nullptr;
     }
 };
+GGML_CPU_VNS_END
 }  // namespace ggml::cpu::repack
 
 ggml_backend_buffer_type_t ggml_backend_cpu_repack_buffer_type(void) {
