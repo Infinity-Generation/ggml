@@ -1,4 +1,22 @@
 function(ggml_add_cpu_backend_features cpu_name arch)
+    if (GGML_CPU_ALL_VARIANTS_STATIC)
+        # Static multi-variant mode: cpu-feats.cpp is compiled INTO the variant TU
+        # set so its score function gets renamed by the variant's prefix header
+        # alongside ggml_backend_cpu_reg. We compile it without arch flags as a
+        # source-file-level override to keep the cpuid probe portable.
+        set(_feats_src "${CMAKE_CURRENT_SOURCE_DIR}/ggml-cpu/arch/${arch}/cpu-feats.cpp")
+        target_sources(${cpu_name} PRIVATE "${_feats_src}")
+        target_compile_definitions(${cpu_name} PRIVATE ${ARGN})
+        # Strip arch flags from cpu-feats.cpp (they'd defeat the runtime probe).
+        set_source_files_properties("${_feats_src}" PROPERTIES
+            COMPILE_OPTIONS ""
+            SKIP_PRECOMPILE_HEADERS ON)
+        if (NOT MSVC)
+            set_property(SOURCE "${_feats_src}" APPEND PROPERTY COMPILE_OPTIONS "-fno-lto")
+        endif()
+        return()
+    endif()
+
     # The feature detection code is compiled as a separate target so that
     # it can be built without the architecture flags
     # Since multiple variants of the CPU backend may be included in the same
@@ -25,6 +43,26 @@ function(ggml_add_cpu_backend_variant_impl tag_name)
     endif()
 
     ggml_add_backend_library(${GGML_CPU_NAME})
+
+    # Static multi-variant mode: generate a per-variant prefix header that renames
+    # every strong external symbol defined by the variant TUs to a tag-suffixed
+    # name. Force-include it into every TU compiled into this variant.
+    set(_static_mv_active FALSE)
+    if (GGML_CPU_ALL_VARIANTS_STATIC AND tag_name)
+        set(_static_mv_active TRUE)
+        set(_mangling_in  "${CMAKE_CURRENT_SOURCE_DIR}/ggml-cpu/cmake/cpu-mangling.h.in")
+        set(_mangling_out "${CMAKE_CURRENT_BINARY_DIR}/ggml-cpu/cpu-mangling-${tag_name}.h")
+        set(GGML_CPU_VARIANT_TAG "${tag_name}")
+        configure_file("${_mangling_in}" "${_mangling_out}" @ONLY)
+        if (MSVC)
+            target_compile_options(${GGML_CPU_NAME} PRIVATE "/FI${_mangling_out}")
+        else()
+            target_compile_options(${GGML_CPU_NAME} PRIVATE "-include" "${_mangling_out}")
+        endif()
+        target_compile_definitions(${GGML_CPU_NAME} PRIVATE
+            GGML_CPU_VARIANT_TAG=${tag_name}
+            GGML_CPU_STATIC_MULTI_VARIANT=1)
+    endif()
 
     list (APPEND GGML_CPU_SOURCES
         ggml-cpu/ggml-cpu.c
@@ -376,10 +414,10 @@ function(ggml_add_cpu_backend_variant_impl tag_name)
             endif()
         endif()
 
-        if (GGML_BACKEND_DL)
+        if (GGML_BACKEND_DL OR GGML_CPU_ALL_VARIANTS_STATIC)
             if (GGML_NATIVE)
                 # the feature check relies on ARCH_DEFINITIONS, but it is not set with GGML_NATIVE
-                message(FATAL_ERROR "GGML_NATIVE is not compatible with GGML_BACKEND_DL, consider using GGML_CPU_ALL_VARIANTS")
+                message(FATAL_ERROR "GGML_NATIVE is not compatible with GGML_BACKEND_DL or GGML_CPU_ALL_VARIANTS_STATIC, consider using GGML_CPU_ALL_VARIANTS")
             endif()
             ggml_add_cpu_backend_features(${GGML_CPU_NAME} x86 ${ARCH_DEFINITIONS})
         endif()

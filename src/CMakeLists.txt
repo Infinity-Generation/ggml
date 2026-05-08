@@ -245,6 +245,11 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux")
 endif()
 
 function(ggml_add_backend_library backend)
+    set(_is_cpu_variant FALSE)
+    if (GGML_CPU_ALL_VARIANTS_STATIC AND backend MATCHES "^ggml-cpu-")
+        set(_is_cpu_variant TRUE)
+    endif()
+
     if (GGML_BACKEND_DL)
         add_library(${backend} MODULE ${ARGN})
         # write the shared library to the output directory
@@ -256,6 +261,15 @@ function(ggml_add_backend_library backend)
         else()
             install(TARGETS ${backend} LIBRARY DESTINATION ${CMAKE_INSTALL_BINDIR})
         endif()
+    elseif (_is_cpu_variant)
+        # Static multi-variant mode: each variant is a STATIC archive that exports
+        # only mangled per-variant entry points (ggml_backend_cpu_reg_<tag> and
+        # ggml_backend_cpu_x86_score_<tag>). The dispatcher TU picks one at runtime
+        # and exposes the unmangled ggml_backend_cpu_reg.
+        add_library(${backend} STATIC ${ARGN})
+        # We deliberately do NOT link this into `ggml` here -- the dispatcher target
+        # added after the variant loop links all variants PUBLIC into ggml.
+        set_property(GLOBAL APPEND PROPERTY GGML_CPU_STATIC_VARIANT_TARGETS ${backend})
     else()
         add_library(${backend} ${ARGN})
         target_link_libraries(ggml PUBLIC ${backend})
@@ -351,10 +365,14 @@ endfunction()
 ggml_add_backend(CPU)
 
 if (GGML_CPU_ALL_VARIANTS)
-    if (NOT GGML_BACKEND_DL)
-        message(FATAL_ERROR "GGML_CPU_ALL_VARIANTS requires GGML_BACKEND_DL")
+    if (NOT GGML_BACKEND_DL AND NOT GGML_CPU_ALL_VARIANTS_STATIC)
+        message(FATAL_ERROR "GGML_CPU_ALL_VARIANTS requires GGML_BACKEND_DL or GGML_CPU_ALL_VARIANTS_STATIC")
+    elseif (GGML_BACKEND_DL AND GGML_CPU_ALL_VARIANTS_STATIC)
+        message(FATAL_ERROR "GGML_CPU_ALL_VARIANTS_STATIC is mutually exclusive with GGML_BACKEND_DL")
     elseif (GGML_CPU_ARM_ARCH)
         message(FATAL_ERROR "Cannot use both GGML_CPU_ARM_ARCH and GGML_CPU_ALL_VARIANTS")
+    elseif (GGML_CPU_ALL_VARIANTS_STATIC AND NOT GGML_SYSTEM_ARCH STREQUAL "x86")
+        message(FATAL_ERROR "GGML_CPU_ALL_VARIANTS_STATIC currently only supports x86 (got ${GGML_SYSTEM_ARCH})")
     endif()
     if (GGML_SYSTEM_ARCH STREQUAL "x86")
         ggml_add_cpu_backend_variant(x64)
@@ -443,6 +461,99 @@ if (GGML_CPU_ALL_VARIANTS)
     endif()
 elseif (GGML_CPU)
     ggml_add_cpu_backend_variant_impl("")
+endif()
+
+if (GGML_CPU_ALL_VARIANTS_STATIC)
+    # Generate the static dispatcher TU. The dispatcher iterates the per-variant
+    # ggml_backend_cpu_<arch>_score_<tag>() functions, picks the highest scoring
+    # supported variant, and exposes its ggml_backend_cpu_reg_<tag>() through the
+    # unmangled ggml_backend_cpu_reg() symbol that ggml-backend-reg.cpp expects.
+    get_property(_static_variant_targets GLOBAL PROPERTY GGML_CPU_STATIC_VARIANT_TARGETS)
+    if (NOT _static_variant_targets)
+        message(FATAL_ERROR "GGML_CPU_ALL_VARIANTS_STATIC: no variant targets were registered")
+    endif()
+
+    # Build the per-arch tag list (strip the 'ggml-cpu-' prefix).
+    set(_variant_tags "")
+    foreach(_t IN LISTS _static_variant_targets)
+        string(REGEX REPLACE "^ggml-cpu-" "" _tag "${_t}")
+        list(APPEND _variant_tags "${_tag}")
+    endforeach()
+
+    # Substitution variables for cpu-dispatcher.cpp.in.
+    if (GGML_SYSTEM_ARCH STREQUAL "x86")
+        set(_arch_score_prefix "ggml_backend_cpu_x86_score")
+    else()
+        message(FATAL_ERROR "GGML_CPU_ALL_VARIANTS_STATIC: dispatcher not yet wired for ${GGML_SYSTEM_ARCH}")
+    endif()
+
+    set(_variant_forward_decls "")
+    set(_variant_public_forwards "")
+    set(_variant_table_entries "")
+    foreach(_tag IN LISTS _variant_tags)
+        string(APPEND _variant_forward_decls
+            "ggml_backend_reg_t ggml_backend_cpu_reg_${_tag}(void)\;\n"
+            "int                ${_arch_score_prefix}_${_tag}(void)\;\n")
+        string(APPEND _variant_public_forwards
+            "ggml_backend_t ggml_backend_cpu_init_${_tag}(void)\;\n"
+            "void ggml_backend_cpu_set_n_threads_${_tag}(ggml_backend_t, int)\;\n"
+            "void ggml_backend_cpu_set_threadpool_${_tag}(ggml_backend_t, ggml_threadpool_t)\;\n"
+            "void ggml_backend_cpu_set_abort_callback_${_tag}(ggml_backend_t, ggml_abort_callback, void *)\;\n"
+            "void ggml_backend_cpu_set_use_ref_${_tag}(ggml_backend_t, bool)\;\n")
+        string(APPEND _variant_table_entries
+            "    { \"${_tag}\","
+            " &${_arch_score_prefix}_${_tag},"
+            " &ggml_backend_cpu_reg_${_tag},"
+            " &ggml_backend_cpu_init_${_tag},"
+            " &ggml_backend_cpu_set_n_threads_${_tag},"
+            " &ggml_backend_cpu_set_threadpool_${_tag},"
+            " &ggml_backend_cpu_set_abort_callback_${_tag},"
+            " &ggml_backend_cpu_set_use_ref_${_tag} },\n")
+    endforeach()
+
+    set(GGML_CPU_DISPATCHER_FORWARD_DECLS    "${_variant_forward_decls}")
+    set(GGML_CPU_DISPATCHER_PUBLIC_FORWARDS  "${_variant_public_forwards}")
+    set(GGML_CPU_DISPATCHER_TABLE_ENTRIES    "${_variant_table_entries}")
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/ggml-cpu/cmake/cpu-dispatcher.cpp.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/ggml-cpu/cpu-dispatcher.cpp"
+        @ONLY)
+
+    add_library(ggml-cpu-dispatch STATIC
+        "${CMAKE_CURRENT_BINARY_DIR}/ggml-cpu/cpu-dispatcher.cpp")
+    target_link_libraries(ggml-cpu-dispatch PRIVATE ggml-base)
+    target_include_directories(ggml-cpu-dispatch PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/.."
+        "${CMAKE_CURRENT_SOURCE_DIR}/../include")
+    target_compile_features(ggml-cpu-dispatch PRIVATE cxx_std_17)
+    set_target_properties(ggml-cpu-dispatch PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+    # Link the dispatcher AND every variant archive into ggml. Whole-archive is
+    # required so the variants' mangled entry points survive --gc-sections / LTO
+    # and can be found by the dispatcher.
+    if (MSVC)
+        target_link_libraries(ggml PUBLIC ggml-cpu-dispatch)
+        foreach(_t IN LISTS _static_variant_targets)
+            target_link_libraries(ggml PUBLIC ${_t})
+            target_link_options(ggml PUBLIC "/WHOLEARCHIVE:$<TARGET_FILE:${_t}>")
+        endforeach()
+    else()
+        target_link_libraries(ggml PUBLIC ggml-cpu-dispatch)
+        foreach(_t IN LISTS _static_variant_targets)
+            if (APPLE)
+                target_link_libraries(ggml PUBLIC "-Wl,-force_load" ${_t})
+            else()
+                target_link_libraries(ggml PUBLIC "-Wl,--whole-archive" ${_t} "-Wl,--no-whole-archive")
+            endif()
+        endforeach()
+    endif()
+
+    # Install the variant archives so external consumers' static link of `ggml`
+    # can resolve them.
+    install(TARGETS ggml-cpu-dispatch ${_static_variant_targets} ARCHIVE)
+
+    set(GGML_CPU_NAME "ggml-cpu")  # for downstream find_package compat
 endif()
 
 ggml_add_backend(BLAS)
