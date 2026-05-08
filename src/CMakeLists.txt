@@ -364,6 +364,13 @@ endfunction()
 
 ggml_add_backend(CPU)
 
+# GGML_CPU_ALL_VARIANTS_STATIC implies GGML_CPU_ALL_VARIANTS — the static
+# multi-variant build needs the variant matrix iterated. Hoist the implication
+# here so downstream consumers only have to set one flag.
+if (GGML_CPU_ALL_VARIANTS_STATIC AND NOT GGML_CPU_ALL_VARIANTS)
+    set(GGML_CPU_ALL_VARIANTS ON)
+endif()
+
 if (GGML_CPU_ALL_VARIANTS)
     if (NOT GGML_BACKEND_DL AND NOT GGML_CPU_ALL_VARIANTS_STATIC)
         message(FATAL_ERROR "GGML_CPU_ALL_VARIANTS requires GGML_BACKEND_DL or GGML_CPU_ALL_VARIANTS_STATIC")
