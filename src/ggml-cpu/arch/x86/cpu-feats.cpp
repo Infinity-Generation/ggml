@@ -260,7 +260,12 @@ void test_x86_is() {
 }
 #endif
 
-static int ggml_backend_cpu_x86_score() {
+#ifdef GGML_CPU_STATIC_MULTI_VARIANT
+extern "C"
+#else
+static
+#endif
+int ggml_backend_cpu_x86_score() {
     // FIXME: this does not check for OS support
 
     int score = 1;
